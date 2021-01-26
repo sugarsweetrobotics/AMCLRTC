@@ -4,6 +4,11 @@
 #include "InterfaceDataTypes.idl"
 
 module NAVIGATION {
+
+  struct Size2D {
+    double width;
+    double height;
+  };
   
   struct OccupancyGridMapConfig {
     RTC::Pose2D globalPositionOfTopLeft; 
@@ -54,7 +59,7 @@ module NAVIGATION {
    */
   struct MCLParticle {
     
-    RTC::Pose3D pose; // 3D Pose. This might be redundant.
+    RTC::Pose2D pose; // 3D Pose. This might be redundant.
     
     double weight;
   };
@@ -95,9 +100,11 @@ module NAVIGATION {
 
 
   struct ParticleResetParam {
-    RTC::Covariance3D sigma;
+    RTC::Covariance2D sigma;
     unsigned long numOfParticles;
-    RTC::Pose3D center;
+    unsigned long maxNumOfParticles;
+    unsigned long minNumOfParticles;
+    RTC::Pose2D center;
   };
   
   /**

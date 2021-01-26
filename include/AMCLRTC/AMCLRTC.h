@@ -33,8 +33,8 @@
 #include <rtm/DataInPort.h>
 #include <rtm/DataOutPort.h>
 
-
-
+#include <mutex>
+#include <algorithm>
 #include "amcl/map/map.h"
 #include "amcl/pf/pf.h"
 #include "amcl/sensors/amcl_odom.h"
@@ -56,6 +56,8 @@ struct laser_config {
   amcl::laser_model_t laser_model_type_;
   beam_model_config beam_model;
   likelihood_field_model_config likelihood_model;
+  double laser_max_range_;
+  double laser_min_range_;  
 };
 
 
@@ -75,6 +77,7 @@ struct pf_config {
   double pf_z_;
   double init_pose_[3];
   double init_cov_[3];
+  double d_thresh_, a_thresh_;
 };
 
 
@@ -278,6 +281,10 @@ class AMCLRTC
    */
   long int m_debug_level;
 
+  double m_initial_pose_x;
+  double m_initial_pose_y;
+  double m_initial_pose_th;
+
   // </rtc-template>
 
   // DataInPort declaration
@@ -296,10 +303,10 @@ class AMCLRTC
 
   // DataOutPort declaration
   // <rtc-template block="outport_declare">
-  RTC::TimedPoint2D m_estimatedPose;
+  RTC::TimedPose2D m_estimatedPose;
   /*!
    */
-  RTC::OutPort<RTC::TimedPoint2D> m_estimatedPoseOut;
+  RTC::OutPort<RTC::TimedPose2D> m_estimatedPoseOut;
   
   // </rtc-template>
 
@@ -340,22 +347,26 @@ class AMCLRTC
   // </rtc-template>
 
 
+  RTC::TimedPose2D m_oldPose;
+public:
+  std::mutex m_pf_lock;
+private:
   
-    map_t* map_;
-    char* mapdata;
-    int sx, sy;
-    double resolution;
+  map_t* map_;
+  //  char* mapdata;
+  //    int sx, sy;
+  //    double resolution;
 
   // Particle filter
-    pf_t *pf_;
+  pf_t *pf_;
   pf_config pf_config_;
-  bool pf_init_;
+  // bool pf_init_;
   
-  pf_vector_t pf_odom_pose_;
-  double d_thresh_, a_thresh_;
-  int resample_count_;  
-  double init_pose_[3];
-  double init_cov_[3];
+  //  pf_vector_t pf_odom_pose_;
+
+  //  int resample_count_;  
+  //  double init_pose_[3];
+  //  double init_cov_[3];
 
   // Odometry Model
   amcl::AMCLOdom* odom_;  
@@ -367,8 +378,8 @@ class AMCLRTC
     double alpha_slow_, alpha_fast_;
     bool selective_resampling_;
   */
-    double laser_min_range_;
-    double laser_max_range_;
+  //    double laser_min_range_;
+
 
   //int max_beams_;
   //int min_particles_, max_particles_;
@@ -385,7 +396,7 @@ class AMCLRTC
   //double laser_likelihood_max_dist_;
 
   //laser_model_t laser_model_type_;
-    bool tf_broadcast_;
+  //    bool tf_broadcast_;
 
 
   
@@ -396,11 +407,13 @@ class AMCLRTC
 
   amcl::AMCLLaser* laser_;
   laser_config laser_config_;
-  std::vector<amcl::AMCLLaser*> lasers_;
-  std::vector<bool> lasers_update_;
-  std::map<std::string, int> frame_to_laser_;
+  //std::vector<amcl::AMCLLaser*> lasers_;
+  //  std::vector<bool> lasers_update_;
+  //  std::map<std::string, int> frame_to_laser_;
 
   void handleMapMessage(const NAVIGATION::OccupancyGridMap& map);
+  bool handleScan();
+  
   void freeMapDependentMemory() {
     if( map_ != NULL ) {
       map_free( map_ );
@@ -414,6 +427,20 @@ class AMCLRTC
     odom_ = NULL;
     delete laser_;
     laser_ = NULL;
+  }
+
+public:
+  bool setMCLInfo(NAVIGATION::MCLInfo_var& info) {
+    std::lock_guard<std::mutex> guard(m_pf_lock);
+    const pf_sample_set_t& set = pf_->sets[pf_->current_set];
+    const long len = set.cluster_count;
+    info->particles.length(len);
+    for(int i = 0;i < len;i++) {
+      info->particles[i].pose.position.x = set.samples[i].pose.v[0];
+      info->particles[i].pose.position.y = set.samples[i].pose.v[1];
+      info->particles[i].pose.heading    = set.samples[i].pose.v[2]; 
+    }
+    return true;
   }
 
 };
@@ -483,7 +510,43 @@ inline pf_t* initPF(const pf_config& config, map_t* map) {
 
   return pf;
 }
-		    
+
+inline amcl::AMCLLaserData convertLaser(amcl::AMCLLaser* laser, const RTC::RangeData& range, const laser_config& config) {
+  amcl::AMCLLaserData ldata;
+  ldata.sensor = laser;
+
+  pf_vector_t laser_pose;
+  laser_pose.v[0] = range.geometry.geometry.pose.position.x;
+  laser_pose.v[1] = range.geometry.geometry.pose.position.y;
+  if (range.geometry.geometry.pose.orientation.y != 0.0) {
+    //RTC_WARN(("AMCLRTC currrent version does not support angular offset of Ranger sensor. Value is %f", range.geometry.geometry.pose.orientation.y));
+  }
+  laser_pose.v[2] = 0; // Angular Offset is not allowed currently
+  ldata.range_count = range.ranges.length();
+  if(config.laser_max_range_ > 0.0)
+    ldata.range_max = std::min(range.config.maxRange, config.laser_max_range_);
+  else
+    ldata.range_max = range.config.maxRange;
+
+  const double range_min = std::max(range.config.minRange, config.laser_min_range_);
+
+  const double angle_min = range.config.minAngle;
+  const double angle_increment = range.config.angularRes;
+
+  ldata.ranges = new double[ldata.range_count][2];
+  for(int i = 0;i < ldata.range_count;i++) {
+    // amcl doesn't (yet) have a concept of min range.  So we'll map short
+    // readings to max range.
+    if(range.ranges[i] <= range_min)
+      ldata.ranges[i][0] = ldata.range_max;
+    else
+      ldata.ranges[i][0] = range.ranges[i];
+    // Compute bearing
+    ldata.ranges[i][1] = angle_min + (i * angle_increment);
+  }
+  return ldata;
+}
+
 inline map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
   map_t* map = map_alloc();
 
@@ -507,7 +570,6 @@ inline map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
   }
   return map;
 }
-
 
 extern "C"
 {

@@ -42,6 +42,9 @@ class NAVIGATION_OccupancyGridMapServerSVC_impl
 
 };
 
+
+class AMCLRTC;
+
 /*!
  * @class NAVIGATION_MonteCarloLocalizationSVC_impl
  * Example class implementing IDL interface NAVIGATION::MonteCarloLocalization
@@ -54,7 +57,10 @@ class NAVIGATION_MonteCarloLocalizationSVC_impl
    // Make sure all instances are built on the heap by making the
    // destructor non-public
    //virtual ~NAVIGATION_MonteCarloLocalizationSVC_impl();
+  AMCLRTC* m_pRTC;
 
+public:
+  void setRTC(AMCLRTC* pRTC) { m_pRTC = pRTC; }
  public:
   /*!
    * @brief standard constructor
