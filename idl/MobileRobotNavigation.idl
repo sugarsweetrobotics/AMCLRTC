@@ -1,0 +1,116 @@
+#ifndef GPSDataTypes_idl
+#define GPSDataTypes_idl
+
+#include "InterfaceDataTypes.idl"
+
+module NAVIGATION {
+  
+  struct OccupancyGridMapConfig {
+    RTC::Pose2D globalPositionOfTopLeft; 
+    RTC::Size2D sizeOfGrid;
+    RTC::Size2D sizeOfMap; 
+  };
+
+  typedef sequence<octet> OccupancyGridMapCells;
+
+  struct OccupancyGridMapRequestParam {
+    RTC::Pose2D globalPositionOfCenter;
+    RTC::Size2D sizeOfMap;
+    RTC::Size2D sizeOfGrid;
+  };
+  
+  struct OccupancyGridMap {
+    OccupancyGridMapCells cells; 
+    OccupancyGridMapConfig config;
+  };
+
+  enum MAP_RETURN_STATUS {
+    MAP_RETVAL_OK,
+    MAP_RETVAL_INVALID_PARAMETER,
+    MAP_RETVAL_EMPTY_MAP,
+    MAP_RETVAL_INVALID_PRECONDITION,
+    MAP_RETVAL_NOT_IMPL,
+    MAP_RETVAL_UNKNOWN_ERROR,
+    MAP_RETVAL_NOT_FOUND,
+    MAP_RETVAL_ODOMETRY_INVALID_VALUE,
+    MAP_RETVAL_ODOMETRY_TIME_OUT,
+    MAP_RETVAL_RANGE_INVALID_VALUE,
+    MAP_RETVAL_RANGE_TIME_OUT,
+    MAP_RETVAL_EMERGENCY_STOP,
+    MAP_RETVAL_OUTOF_RANGE
+  };
+
+  /**
+   *
+   */
+  interface OccupancyGridMapServer {
+  
+    MAP_RETURN_STATUS requestLocalMap(in OccupancyGridMapRequestParam param, out OccupancyGridMap map);
+  };
+  
+  /**
+   * Particle Information.
+   * This struct is specialized for Monte-Carlo Localization.
+   */
+  struct MCLParticle {
+    
+    RTC::Pose3D pose; // 3D Pose. This might be redundant.
+    
+    double weight;
+  };
+  typedef sequence<MCLParticle> MCLParticleList;
+
+  /**
+   * Key Value pair.
+   */
+  struct MCLConfigKeyValue {
+    string key;
+    string value;
+  };
+  typedef sequence<MCLConfigKeyValue> MCLConfigMap;
+  
+
+  /**
+   *
+   */
+  struct MCLInfo {
+
+    /**
+     * Particle Information
+     */
+    MCLParticleList particles;
+
+    /**
+     * Configuration is provided with Key-value string pair.
+     */
+    MCLConfigMap config;
+  };
+
+
+  enum MCL_RETURN_STATUS {
+    MCL_RETVAL_OK,
+    MCL_RETVAL_FAILED_UNKNOWN,
+    MCL_RETVAL_NOT_IMPL
+  };
+
+
+  struct ParticleResetParam {
+    RTC::Covariance3D sigma;
+    unsigned long numOfParticles;
+    RTC::Pose3D center;
+  };
+  
+  /**
+   * Interface for Service Port of MCL (Monte Carlo Localization
+   */
+  interface MonteCarloLocalization {
+
+    MCL_RETURN_STATUS resetParticles(in ParticleResetParam param);
+    
+    MCL_RETURN_STATUS requestParticles(out MCLInfo particles);
+    
+    MCL_RETURN_STATUS setParticles(in MCLInfo particles);
+  };
+};
+
+#endif
