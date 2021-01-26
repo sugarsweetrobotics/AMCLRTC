@@ -41,28 +41,31 @@
 #include "amcl/sensors/amcl_laser.h"
 
 struct beam_model_config {
-  double z_hit_, z_short_, z_max_, z_rand_, sigma_hit_, lambda_short_;  
+
 };
 
 struct likelihood_field_model_config {
-  double z_hit_, z_rand_, sigma_hit_;
+  //  double z_hit_, z_rand_, sigma_hit_;
   bool do_beamskip_;
   double beam_skip_distance_, beam_skip_threshold_, beam_skip_error_threshold_;
-  double laser_likelihood_max_dist_;
+  double max_dist_;
 };
 
 struct laser_config {
   int max_beams_;
-  amcl::laser_model_t laser_model_type_;
-  beam_model_config beam_model;
-  likelihood_field_model_config likelihood_model;
-  double laser_max_range_;
-  double laser_min_range_;  
+  amcl::laser_model_t model_type_;
+  std::string model_type_str_;
+  double z_hit_, z_short_, z_max_, z_rand_, sigma_hit_, lambda_short_;    
+  beam_model_config beam_model_;
+  likelihood_field_model_config likelihood_model_;
+  double max_range_;
+  double min_range_;  
 };
 
 
 struct odom_config {
-  amcl::odom_model_t odom_model_type_;
+  amcl::odom_model_t model_type_;
+  std::string model_type_str_;
   double alpha1_, alpha2_, alpha3_, alpha4_, alpha5_;
 };
 
@@ -449,35 +452,35 @@ public:
 inline amcl::AMCLLaser* initLaser(const laser_config& config, map_t* map) {
   amcl::AMCLLaser* laser = new amcl::AMCLLaser(config.max_beams_, map);
 
-  if(config.laser_model_type_ == amcl::LASER_MODEL_BEAM) {
-    laser->SetModelBeam(config.beam_model.z_hit_,
-			config.beam_model.z_short_,
-			config.beam_model.z_max_,
-			config.beam_model.z_rand_,
-			config.beam_model.sigma_hit_,
-			config.beam_model.lambda_short_, 0.0);
-  } else if(config.laser_model_type_ == amcl::LASER_MODEL_LIKELIHOOD_FIELD_PROB) {
-    laser->SetModelLikelihoodFieldProb(config.likelihood_model.z_hit_,
-				       config.likelihood_model.z_rand_,
-				       config.likelihood_model.sigma_hit_,
-				       config.likelihood_model.laser_likelihood_max_dist_, 
-				       config.likelihood_model.do_beamskip_,
-				       config.likelihood_model.beam_skip_distance_, 
-				       config.likelihood_model.beam_skip_threshold_,
-				       config.likelihood_model.beam_skip_error_threshold_);
-  } else if(config.laser_model_type_ == amcl::LASER_MODEL_LIKELIHOOD_FIELD) {
+  if(config.model_type_ == amcl::LASER_MODEL_BEAM) {
+    laser->SetModelBeam(config.z_hit_,
+			config.z_short_,
+			config.z_max_,
+			config.z_rand_,
+			config.sigma_hit_,
+			config.lambda_short_, 0.0);
+  } else if(config.model_type_ == amcl::LASER_MODEL_LIKELIHOOD_FIELD_PROB) {
+    laser->SetModelLikelihoodFieldProb(config.z_hit_,
+				       config.z_rand_,
+				       config.sigma_hit_,
+				       config.likelihood_model_.max_dist_, 
+				       config.likelihood_model_.do_beamskip_,
+				       config.likelihood_model_.beam_skip_distance_, 
+				       config.likelihood_model_.beam_skip_threshold_,
+				       config.likelihood_model_.beam_skip_error_threshold_);
+  } else if(config.model_type_ == amcl::LASER_MODEL_LIKELIHOOD_FIELD) {
     //RTC_INFO("Initializing likelihood field model; this can take some time on large maps...");
-    laser->SetModelLikelihoodField(config.likelihood_model.z_hit_,
-				   config.likelihood_model.z_rand_,
-				   config.likelihood_model.sigma_hit_,
-				   config.likelihood_model.laser_likelihood_max_dist_);
+    laser->SetModelLikelihoodField(config.z_hit_,
+				   config.z_rand_,
+				   config.sigma_hit_,
+				   config.likelihood_model_.max_dist_);
   }
   return laser;
 }
 
 inline amcl::AMCLOdom* initOdom(const odom_config& config) {
   amcl::AMCLOdom* odom = new amcl::AMCLOdom();
-  odom->SetModel(config.odom_model_type_,
+  odom->SetModel(config.model_type_,
 		 config.alpha1_,
 		 config.alpha2_,
 		 config.alpha3_,
@@ -523,12 +526,12 @@ inline amcl::AMCLLaserData convertLaser(amcl::AMCLLaser* laser, const RTC::Range
   }
   laser_pose.v[2] = 0; // Angular Offset is not allowed currently
   ldata.range_count = range.ranges.length();
-  if(config.laser_max_range_ > 0.0)
-    ldata.range_max = std::min(range.config.maxRange, config.laser_max_range_);
+  if(config.max_range_ > 0.0)
+    ldata.range_max = std::min(range.config.maxRange, config.max_range_);
   else
     ldata.range_max = range.config.maxRange;
 
-  const double range_min = std::max(range.config.minRange, config.laser_min_range_);
+  const double range_min = std::max(range.config.minRange, config.min_range_);
 
   const double angle_min = range.config.minAngle;
   const double angle_increment = range.config.angularRes;

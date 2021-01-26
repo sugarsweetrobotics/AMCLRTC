@@ -27,13 +27,46 @@ static const char* amclrtc_spec[] =
     "lang_type",         "compile",
     // Configuration variables
     "conf.default.debug_level", "1",
+
+    "conf.default.min_particles", "100",
+    "conf.default.max_particles", "5000",
+    "conf.default.kld_err", "0.01",
+    "conf.default.kld_z", "0.99",
+    "conf.default.update_min_d", "0.2",
+    "conf.default.update_min_a", "0.5236",
+    "conf.default.resample_interval", "2",
+    "conf.default.recovery_alpha_slow", "0.0",
+    "conf.default.recovery_alpha_fast", "0.0",
     "conf.default.initial_pose_x", "0.0",
     "conf.default.initial_pose_y", "0.0",
-    "conf.default.initial_pose_th", "0.0",
+    "conf.default.initial_pose_a", "0.0",
+    "conf.default.initial_cov_xx", "0.25",
+    "conf.default.initial_cov_yy", "0.25",
+    "conf.default.initial_cov_aa", "0.068535",
+    "conf.default.laser_min_range", "-1.0",
+    "conf.default.laser_max_range", "-1.0",
+    "conf.default.laser_max_beams", "30",
+    "conf.default.laser_z_hit", "0.95",
+    "conf.default.laser_z_short", "0.1",
+    "conf.default.laser_z_max", "0.05",
+    "conf.default.laser_z_rand", "0.05",
+    "conf.default.laser_sigma_hit", "0.2",
+    "conf.default.laser_lambda_short", "0.1",
+    "conf.default.laser_likelihood_max_dist", "2.0",
+    "conf.default.laser_model_type", "likelihood_field",
+    "conf.default.odom_model_type", "diff",
+    "conf.default.odom_alpha1", "0.2",
+    "conf.default.odom_alpha2", "0.2",    
+    "conf.default.odom_alpha3", "0.2",
+    "conf.default.odom_alpha4", "0.2",
+    "conf.default.odom_alpha5", "0.2",
     // Widget
     "conf.__widget__.debug_level", "text",
+    "conf.__widget__.laser_model_type", "radio",
+    "conf.__widget__.odom_model_type", "radio",
     // Constraints
-
+    "conf.__constraints__.laser_model_type", "(likelihood_field, beam, likelihood_field_prob)",
+    "conf.__constraints__.odom_model_type", "(diff, omni, diff-corrected, omni-corrected)",
     "conf.__type__.debug_level", "long",
 
     ""
@@ -233,9 +266,38 @@ RTC::ReturnCode_t AMCLRTC::onInitialize()
   // <rtc-template block="bind_config">
   // Bind variables and configuration variable
   bindParameter("debug_level", m_debug_level, "1");
-  bindParameter("initial_pose_x", m_initial_pose_x, "0.0");
-  bindParameter("initial_pose_y", m_initial_pose_y, "0.0");
-  bindParameter("initial_pose_th", m_initial_pose_th, "0.0");
+
+
+  bindParameter("min_particles", pf_config_.min_particles_, "100");
+  bindParameter("max_particles", pf_config_.max_particles_, "5000");
+  bindParameter("kld_err", pf_config_.pf_err_, "0.01");
+  bindParameter("kld_z", pf_config_.pf_z_, "0.99");
+  bindParameter("update_min_d", pf_config_.d_thresh_, "0.2");
+  bindParameter("update_min_a", pf_config_.a_thresh_, "0.5236");
+  bindParameter("recovery_alpha_slow", pf_config_.alpha_slow_, "0.0");
+  bindParameter("recovery_alpha_fast", pf_config_.alpha_fast_, "0.0");
+  bindParameter("initial_pose_x", pf_config_.init_pose_[0], "0.0");
+  bindParameter("initial_pose_y", pf_config_.init_pose_[1], "0.0");
+  bindParameter("initial_pose_a", pf_config_.init_pose_[2], "0.0");
+  bindParameter("initial_cov_xx", pf_config_.init_cov_[0], "0.25");
+  bindParameter("initial_cov_yy", pf_config_.init_cov_[1], "0.25");
+  bindParameter("initial_cov_aa", pf_config_.init_cov_[2], "0.068535");
+  bindParameter("laser_min_range", laser_config_.min_range_, "-1.0");
+  bindParameter("laser_max_range", laser_config_.max_range_, "-1.0");
+  bindParameter("laser_z_hit", laser_config_.z_hit_, "0.95");
+  bindParameter("laser_z_short", laser_config_.z_short_, "0.1");
+  bindParameter("laser_z_max", laser_config_.z_max_, "0.05");
+  bindParameter("laser_z_rand", laser_config_.z_rand_, "0.05");
+  bindParameter("laser_sigma_hit", laser_config_.sigma_hit_, "0.2");
+  bindParameter("laser_lambda_short", laser_config_.lambda_short_, "0.1");
+  bindParameter("laser_likelihood_max_dist", laser_config_.likelihood_model_.max_dist_, "2.0");
+  bindParameter("laser_model_type", laser_config_.model_type_str_, "likelihood_field");
+  bindParameter("odom_model_type", odom_config_.model_type_str_, "diff");
+  bindParameter("odom_alpha1", odom_config_.alpha1_, "0.2");
+  bindParameter("odom_alpha2", odom_config_.alpha2_, "0.2");
+  bindParameter("odom_alpha3", odom_config_.alpha3_, "0.2");
+  bindParameter("odom_alpha4", odom_config_.alpha4_, "0.2");
+  bindParameter("odom_alpha5", odom_config_.alpha5_, "0.2");  
 
   // </rtc-template>
 
