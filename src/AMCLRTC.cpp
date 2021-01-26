@@ -62,6 +62,47 @@ AMCLRTC::~AMCLRTC()
 }
 
 
+void AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
+  //const nav_msgs::OccupancyGrid& msg;
+  //boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
+
+  auto pixel_x = map.config.sizeOfMap.l / map.config.sizeOfGrid.l;
+  auto pixel_y = map.config.sizeOfMap.w / map.config.sizeOfGrid.w;
+  RTC_INFO(("AMCLRTC::handleMapMessage(map w=%d,h=%d)", pixel_x, pixel_y));
+  freeMapDependentMemory();
+  
+  // Clear queued laser objects because they hold pointers to the existing
+  // map, #5202.
+  lasers_.clear();
+  lasers_update_.clear();
+  frame_to_laser_.clear();
+
+  map_ = convertMap(map);
+
+#if NEW_UNIFORM_SAMPLING
+  // Index of free space
+  free_space_indices.resize(0);
+  for(int i = 0; i < map_->size_x; i++)
+    for(int j = 0; j < map_->size_y; j++)
+      if(map_->cells[MAP_INDEX(map_,i,j)].occ_state == -1)
+        free_space_indices.push_back(std::make_pair(i,j));
+#endif
+  // Create the particle filter
+  delete pf_;
+  pf_ = initPF(pf_config_, map_);
+  pf_init_ = false;  
+  // Instantiate the sensor objects
+  // Odometry
+  delete odom_;
+  odom_ = initOdom(odom_config_);
+  // Laser
+  delete laser_;
+  laser_ = initLaser(laser_config_, map_);
+  
+  // In case the initial pose message arrived before the first map,
+  // try to apply the initial pose now that the map has arrived.
+  // applyInitialPose();
+}
 
 RTC::ReturnCode_t AMCLRTC::onInitialize()
 {
@@ -118,6 +159,7 @@ RTC::ReturnCode_t AMCLRTC::onShutdown(RTC::UniqueId ec_id)
 
 RTC::ReturnCode_t AMCLRTC::onActivated(RTC::UniqueId ec_id)
 {
+
   return RTC::RTC_OK;
 }
 
