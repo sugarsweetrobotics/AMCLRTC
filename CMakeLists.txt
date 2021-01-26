@@ -117,6 +117,8 @@ if(BUILD_DOCUMENTATION)
     add_subdirectory(doc)
 endif(BUILD_DOCUMENTATION)
 
+add_subdirectory(navigation_amcl)
+
 #if(BUILD_EXAMPLES)
 #    add_subdirectory(examples)
 #endif(BUILD_EXAMPLES)
