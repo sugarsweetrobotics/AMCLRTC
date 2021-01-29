@@ -203,6 +203,11 @@ bool AMCLRTC::handleScan() {
       return true;
     }
   }
+  
+  m_estimatedPose.data.position.x = m_estimatedPose.data.position.x + odata.delta.v[0];
+  m_estimatedPose.data.position.y = m_estimatedPose.data.position.y + odata.delta.v[1];
+  m_estimatedPose.data.heading    = m_estimatedPose.data.heading + odata.delta.v[2];
+  
   m_oldPose = m_robotPose;        
   
   return false;
@@ -396,10 +401,10 @@ RTC::ReturnCode_t AMCLRTC::onExecute(RTC::UniqueId ec_id)
   if (m_rangeIn.isNew()) {
     m_rangeIn.read();
     if (handleScan()) {
-      setTimestamp(m_estimatedPose);
-      m_estimatedPoseOut.write();
       //m_oldPose = m_estimatedPose;
     }
+    setTimestamp(m_estimatedPose);
+    m_estimatedPoseOut.write();
   }
 
   
