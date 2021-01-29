@@ -42,7 +42,7 @@ static const char* amclrtc_spec[] =
     "conf.default.initial_pose_a", "0.0",
     "conf.default.initial_cov_xx", "0.25",
     "conf.default.initial_cov_yy", "0.25",
-    "conf.default.initial_cov_aa", "0.068535",
+    "conf.default.initial_cov_aa", "0.68535",
     "conf.default.laser_min_range", "-1.0",
     "conf.default.laser_max_range", "-1.0",
     "conf.default.laser_max_beams", "30",
@@ -130,6 +130,7 @@ inline pf_vector_t diff(const RTC::Pose2D& x0, const RTC::Pose2D& x1) {
 
 
 bool checkNeedUpdate(const pf_vector_t& delta, const pf_config& config) {
+  std::cout << "checkNeedUpdate(config=(" << config.d_thresh_ << "," << config.a_thresh_ << ")" << std::endl;
   return (fabs(delta.v[0]) > config.d_thresh_ ||
 	  fabs(delta.v[1]) > config.d_thresh_ ||
 	  fabs(delta.v[2]) > config.a_thresh_);
@@ -147,6 +148,7 @@ typedef struct
 } amcl_hyp_t;
 
 inline bool estimatePose(pf_t* pf, RTC::Pose2D& estimatedPose) {
+  //  std::cout << " - estimatePose called" << std::endl;
   double max_weight = 0.0;
   int max_weight_count = -1;
   std::vector<amcl_hyp_t> hyps;
@@ -165,22 +167,28 @@ inline bool estimatePose(pf_t* pf, RTC::Pose2D& estimatedPose) {
   }
 
   if (max_weight < 0.0) {
+    std::cout << " - max weight is negative... failed." << std::endl;
     return false;
   }
+  std::cout << " - max_weight = " << max_weight << std::endl;
 
   estimatedPose.position.x = hyps[max_weight_count].pf_pose_mean.v[0];
   estimatedPose.position.y = hyps[max_weight_count].pf_pose_mean.v[1];
   estimatedPose.heading = hyps[max_weight_count].pf_pose_mean.v[2];
-
+  std::cout << " - estimatedPose is (" << estimatedPose.position.x << "," << estimatedPose.position.y << "," << estimatedPose.heading << ")" << std::endl;
   return true;
 }
 
 bool AMCLRTC::handleScan() {
+  //  std::cout << "AMCLRTC::handleScan()" << std::endl;
+  //  std::cout << "AMCLRTC  pf size : " << pf_->sets[pf_->current_set].sample_count << std::endl;
   std::lock_guard<std::mutex> guard(m_pf_lock);  
-  const pf_vector_t delta = diff(m_robotPose.data, m_estimatedPose.data);
+  const pf_vector_t delta = diff(m_robotPose.data, m_receivedPoseWhenUpdated.data);
+  // std::cout << "PoseDelta(" << delta.v[0] << "," << delta.v[1] << "," << delta.v[2] << ")" << std::endl;
+
   amcl::AMCLOdomData odata;
   odata.pose = convertPose(m_robotPose.data);
-  odata.delta = delta;
+  odata.delta = diff(m_robotPose.data, m_oldPose.data);
   odom_->UpdateAction(pf_, (amcl::AMCLSensorData*)&odata);
   
   amcl::AMCLLaserData laserData = convertLaser(laser_, m_range, laser_config_);
@@ -188,21 +196,24 @@ bool AMCLRTC::handleScan() {
 
   const bool needUpdatePF = checkNeedUpdate(delta, pf_config_);
   if (needUpdatePF) {
+    std::cout <<" - needUpdatePF" << std::endl;
     pf_update_resample(pf_);
     if (estimatePose(pf_, m_estimatedPose.data)) {
-
+      m_receivedPoseWhenUpdated = m_robotPose;
       return true;
     }
   }
+  m_oldPose = m_robotPose;        
+  
   return false;
 }
 
 void AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
   //const nav_msgs::OccupancyGrid& msg;
   //boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
-
-  auto pixel_x = map.config.sizeOfMap.l / map.config.sizeOfGrid.l;
-  auto pixel_y = map.config.sizeOfMap.w / map.config.sizeOfGrid.w;
+  std::cout << "AMCLRTC::handleMapMessage() called" << std::endl;
+  auto pixel_x = map.config.sizeOfMap.w / map.config.sizeOfGrid.w;
+  auto pixel_y = map.config.sizeOfMap.l / map.config.sizeOfGrid.l;
   RTC_INFO(("AMCLRTC::handleMapMessage(map w=%d,h=%d)", pixel_x, pixel_y));
   freeMapDependentMemory();
   
@@ -229,9 +240,11 @@ void AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
   // Instantiate the sensor objects
   // Odometry
   delete odom_;
+  odom_config_.model_type_ = amcl::ODOM_MODEL_DIFF;
   odom_ = initOdom(odom_config_);
   // Laser
   delete laser_;
+  laser_config_.model_type_ = amcl::LASER_MODEL_LIKELIHOOD_FIELD;
   laser_ = initLaser(laser_config_, map_);
   
   // In case the initial pose message arrived before the first map,
@@ -328,6 +341,7 @@ RTC::ReturnCode_t AMCLRTC::onShutdown(RTC::UniqueId ec_id)
 
 RTC::ReturnCode_t AMCLRTC::onActivated(RTC::UniqueId ec_id)
 {
+  std::cout << "AMCLRTC::onActivated called" << std::endl;
   NAVIGATION::OccupancyGridMap_var map;
   NAVIGATION::OccupancyGridMapRequestParam param;
   param.globalPositionOfCenter.position.x = 0;
@@ -337,17 +351,32 @@ RTC::ReturnCode_t AMCLRTC::onActivated(RTC::UniqueId ec_id)
   param.sizeOfMap.w = 100;
   param.sizeOfGrid.l = 0.05;
   param.sizeOfGrid.w = 0.05;
+  std::cout << "AMCLRTC: - requesting map..." << std::endl;
   auto retval = m_NAVIGATION_OccupancyGridMapServer->requestLocalMap(param, map);
+  std::cout << "AMCLRTC: reust map result is " << retval << std::endl;
 
-
+  handleMapMessage(map);
+  std::cout << "AMCLRTC: waiting for RobotPose data is received." << std::endl;  
   while(!m_robotPoseIn.isNew()) {
-    m_robotPoseIn.read();
-    m_oldPose = m_robotPose;
+    //    std::cout << "AMCLRTC: waiting for RobotPose data is received." << std::endl;
   }
+  m_robotPoseIn.read();
+  m_oldPose = m_robotPose;
+  m_receivedPoseWhenUpdated = m_robotPose;
+  std::cout << "AMCLRTC: waiting for Range data is received." << std::endl;    
+  while(!m_rangeIn.isNew()) {
+    //    std::cout << "AMCLRTC: waiting for Range data is received." << std::endl;    
+  }
+  m_rangeIn.read();
+  
   m_estimatedPose.data.position.x = m_initial_pose_x;
   m_estimatedPose.data.position.y = m_initial_pose_y;
   m_estimatedPose.data.heading = m_initial_pose_th;
-  
+
+  setTimestamp(m_estimatedPose);
+  m_estimatedPoseOut.write();
+
+  std::cout << "AMCLRTC::onActivated() exit" << std::endl;
   return RTC::RTC_OK;
 }
 
@@ -362,7 +391,6 @@ RTC::ReturnCode_t AMCLRTC::onExecute(RTC::UniqueId ec_id)
 {
   if (m_robotPoseIn.isNew()) {
     m_robotPoseIn.read();
-    
   }
 
   if (m_rangeIn.isNew()) {
@@ -370,7 +398,7 @@ RTC::ReturnCode_t AMCLRTC::onExecute(RTC::UniqueId ec_id)
     if (handleScan()) {
       setTimestamp(m_estimatedPose);
       m_estimatedPoseOut.write();
-      m_oldPose = m_estimatedPose;
+      //m_oldPose = m_estimatedPose;
     }
   }
 

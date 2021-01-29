@@ -351,6 +351,7 @@ class AMCLRTC
 
 
   RTC::TimedPose2D m_oldPose;
+  RTC::TimedPose2D m_receivedPoseWhenUpdated;
 public:
   std::mutex m_pf_lock;
 private:
@@ -434,14 +435,24 @@ private:
 
 public:
   bool setMCLInfo(NAVIGATION::MCLInfo_var& info) {
-    std::lock_guard<std::mutex> guard(m_pf_lock);
+    //s td::lock_guard<std::mutex> guard(m_pf_lock);
+    std::cout << "[AMCLRTC::setMCLInfo called" << std::endl;
     const pf_sample_set_t& set = pf_->sets[pf_->current_set];
-    const long len = set.cluster_count;
+    const long len = set.sample_count;
     info->particles.length(len);
+    double maxWeight = -1;
+    int maxWeightIndex = -1;
     for(int i = 0;i < len;i++) {
       info->particles[i].pose.position.x = set.samples[i].pose.v[0];
       info->particles[i].pose.position.y = set.samples[i].pose.v[1];
-      info->particles[i].pose.heading    = set.samples[i].pose.v[2]; 
+      info->particles[i].pose.heading    = set.samples[i].pose.v[2];
+      info->particles[i].weight          = set.samples[i].weight;
+      if (maxWeight < set.samples[i].weight) {
+	maxWeight = set.samples[i].weight;
+	maxWeightIndex = i;
+      }
+      info->maxWeight = maxWeight;
+      info->maxWeightIndex = maxWeightIndex;
     }
     return true;
   }
@@ -490,6 +501,8 @@ inline amcl::AMCLOdom* initOdom(const odom_config& config) {
 }
 
 inline pf_t* initPF(const pf_config& config, map_t* map) {
+  std::cout << "min_particles_: "<< config.min_particles_ << std::endl;
+  std::cout << "max_particles_: "<< config.max_particles_ << std::endl;  
   pf_t* pf = pf_alloc(config.min_particles_,
 		       config.max_particles_,
 		       config.alpha_slow_,
@@ -525,6 +538,8 @@ inline amcl::AMCLLaserData convertLaser(amcl::AMCLLaser* laser, const RTC::Range
     //RTC_WARN(("AMCLRTC currrent version does not support angular offset of Ranger sensor. Value is %f", range.geometry.geometry.pose.orientation.y));
   }
   laser_pose.v[2] = 0; // Angular Offset is not allowed currently
+  //  std::cout << " - laser_offset(" << laser_pose.v[0] << "," << laser_pose.v[1] << "," << laser_pose.v[2] << std::endl;
+  laser->SetLaserPose(laser_pose);
   ldata.range_count = range.ranges.length();
   if(config.max_range_ > 0.0)
     ldata.range_max = std::min(range.config.maxRange, config.max_range_);
@@ -535,15 +550,22 @@ inline amcl::AMCLLaserData convertLaser(amcl::AMCLLaser* laser, const RTC::Range
 
   const double angle_min = range.config.minAngle;
   const double angle_increment = range.config.angularRes;
+  //std::cout << " - range_min      : " << range_min << std::endl;
+  //std::cout << " - range_max      : " << ldata.range_max << std::endl;  
+  //std::cout << " - angle_min      : " << angle_min << std::endl;
+  //std::cout << " - angle_increment: " << angle_increment << std::endl;  
 
   ldata.ranges = new double[ldata.range_count][2];
   for(int i = 0;i < ldata.range_count;i++) {
     // amcl doesn't (yet) have a concept of min range.  So we'll map short
     // readings to max range.
-    if(range.ranges[i] <= range_min)
+    if(range.ranges[i] <= range_min) {
       ldata.ranges[i][0] = ldata.range_max;
-    else
+      //ldata.ranges[ldata.range_count - i - 1][0] = ldata.range_max;
+    } else {
       ldata.ranges[i][0] = range.ranges[i];
+      //ldata.ranges[ldata.range_count - i - 1][0] = range.ranges[i];
+    }
     // Compute bearing
     ldata.ranges[i][1] = angle_min + (i * angle_increment);
   }
@@ -555,20 +577,29 @@ inline map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
 
   map->size_x = ogmap.config.sizeOfMap.w / ogmap.config.sizeOfGrid.w;
   map->size_y = ogmap.config.sizeOfMap.l / ogmap.config.sizeOfGrid.l;
-  map->scale = ogmap.config.sizeOfMap.w;
-  map->origin_x = ogmap.config.globalPositionOfTopLeft.position.x + (map->size_x / 2) * map->scale;
-  map->origin_y = ogmap.config.globalPositionOfTopLeft.position.y + (map->size_y / 2) * map->scale;
-  
+  map->scale = ogmap.config.sizeOfGrid.w;
+  map->origin_x = -ogmap.config.globalPositionOfTopLeft.position.x + (map->size_x / 2) * map->scale;
+  map->origin_y = -ogmap.config.globalPositionOfTopLeft.position.y + (map->size_y / 2) * map->scale;
+  std::cout << "convertMap:" << std::endl;
+  std::cout << " size_x: " << map->size_x << std::endl;
+  std::cout << " size_y: " << map->size_y << std::endl;
+  std::cout << " scale: " << map->scale << std::endl;
+  std::cout << " origin_x: " << map->origin_x << std::endl;
+  std::cout << " origin_y: " << map->origin_y << std::endl;  
+  //std::cout << " cel:" << std::endl;
   // Convert to player format
   map->cells = (map_cell_t*)malloc(sizeof(map_cell_t)*map->size_x*map->size_y);
   const int size = map->size_x*map->size_y;
   for (int i = 0;i < size;i++) {
     if(ogmap.cells[i] == 0) {
       map->cells[i].occ_state = -1;
-    } else if(ogmap.cells[i] == 100) {
+      //std::cout << "+";
+    } else if(ogmap.cells[i] <= 200) {
       map->cells[i].occ_state = +1;
+      //std::cout << "-";      
     } else {
       map->cells[i].occ_state = 0;
+      //std::cout << "0";      
     }
   }
   return map;
