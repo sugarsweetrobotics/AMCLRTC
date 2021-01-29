@@ -10,6 +10,13 @@
 #ifndef AMCLRTC_H
 #define AMCLRTC_H
 
+
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <mutex>
+#include <algorithm>
+
+
 #include <rtm/idl/BasicDataTypeSkel.h>
 #include <rtm/idl/ExtendedDataTypesSkel.h>
 #include <rtm/idl/InterfaceDataTypesSkel.h>
@@ -33,12 +40,32 @@
 #include <rtm/DataInPort.h>
 #include <rtm/DataOutPort.h>
 
-#include <mutex>
-#include <algorithm>
 #include "amcl/map/map.h"
 #include "amcl/pf/pf.h"
 #include "amcl/sensors/amcl_odom.h"
 #include "amcl/sensors/amcl_laser.h"
+
+#if WIN32
+#ifdef min
+
+#define MIN(x, y) ((x > y) ? (y) : (x))
+#define MAX(x, y) ((x > y) ? (x) : (y))
+
+#else
+
+#define MIN(x, y) std::min((x), (y))
+#define MAX(x, y) std::max((x), (y))
+
+
+#endif
+
+#else // WIN32
+
+#define MIN(x, y) std::min((x), (y))
+#define MAX(x, y) std::max((x), (y))
+
+#endif // WIN32
+
 
 struct beam_model_config {
 
@@ -55,7 +82,7 @@ struct laser_config {
   int max_beams_;
   amcl::laser_model_t model_type_;
   std::string model_type_str_;
-  double z_hit_, z_short_, z_max_, z_rand_, sigma_hit_, lambda_short_;    
+  double z_hit_, z_short_, z_max_, z_rand_, sigma_hit_, lambda_short_;  
   beam_model_config beam_model_;
   likelihood_field_model_config likelihood_model_;
   double max_range_;
@@ -542,11 +569,11 @@ inline amcl::AMCLLaserData convertLaser(amcl::AMCLLaser* laser, const RTC::Range
   laser->SetLaserPose(laser_pose);
   ldata.range_count = range.ranges.length();
   if(config.max_range_ > 0.0)
-    ldata.range_max = std::min(range.config.maxRange, config.max_range_);
+    ldata.range_max = MIN(range.config.maxRange, config.max_range_);
   else
     ldata.range_max = range.config.maxRange;
 
-  const double range_min = std::max(range.config.minRange, config.min_range_);
+  const double range_min = MAX(range.config.minRange, config.min_range_);
 
   const double angle_min = range.config.minAngle;
   const double angle_increment = range.config.angularRes;
