@@ -356,8 +356,8 @@ RTC::ReturnCode_t AMCLRTC::onActivated(RTC::UniqueId ec_id)
   param.globalPositionOfCenter.position.x = 0;
   param.globalPositionOfCenter.position.y = 0;
   param.globalPositionOfCenter.heading = 0;
-  param.sizeOfMap.l = 100;
-  param.sizeOfMap.w = 100;
+  param.sizeOfMap.l = -1; // Negative Value ... Maximum Size.
+  param.sizeOfMap.w = -1; // Negative Value ... Maximum Size.
   param.sizeOfGrid.l = 0.05;
   param.sizeOfGrid.w = 0.05;
   std::cout << "AMCLRTC: - requesting map..." << std::endl;
