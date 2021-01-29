@@ -78,13 +78,17 @@ static const char* amclrtc_spec[] =
  * @param manager Maneger Object
  */
 AMCLRTC::AMCLRTC(RTC::Manager* manager)
-    // <rtc-template block="initializer">
-  : RTC::DataFlowComponentBase(manager),
-    m_robotPoseIn("robotPose", m_robotPose),
-    m_rangeIn("range", m_range),
-    m_estimatedPoseOut("estimatedPose", m_estimatedPose),
-    m_mclServicePort("mclService"),
-    m_mapServicePort("mapService")
+// <rtc-template block="initializer">
+	: RTC::DataFlowComponentBase(manager),
+	m_robotPoseIn("robotPose", m_robotPose),
+	m_rangeIn("range", m_range),
+	m_estimatedPoseOut("estimatedPose", m_estimatedPose),
+	m_mclServicePort("mclService"),
+	m_mapServicePort("mapService"),
+	map_(nullptr),
+	pf_(nullptr),
+	odom_(nullptr),
+	laser_(nullptr)
 
     // </rtc-template>
 {
@@ -191,9 +195,9 @@ bool AMCLRTC::handleScan() {
   odata.delta = diff(m_robotPose.data, m_oldPose.data);
   odom_->UpdateAction(pf_, (amcl::AMCLSensorData*)&odata);
   
-  amcl::AMCLLaserData laserData = convertLaser(laser_, m_range, laser_config_);
-  laser_->UpdateSensor(pf_, (amcl::AMCLSensorData*)&laserData);
-
+  amcl::AMCLLaserData* laserData = convertLaser(laser_, m_range, laser_config_);
+  laser_->UpdateSensor(pf_, (amcl::AMCLSensorData*)laserData);
+  delete laserData;
   const bool needUpdatePF = checkNeedUpdate(delta, pf_config_);
   if (needUpdatePF) {
     std::cout <<" - needUpdatePF" << std::endl;

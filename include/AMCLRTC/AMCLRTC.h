@@ -554,8 +554,9 @@ inline pf_t* initPF(const pf_config& config, map_t* map) {
   return pf;
 }
 
-inline amcl::AMCLLaserData convertLaser(amcl::AMCLLaser* laser, const RTC::RangeData& range, const laser_config& config) {
-  amcl::AMCLLaserData ldata;
+inline amcl::AMCLLaserData* convertLaser(amcl::AMCLLaser* laser, const RTC::RangeData& range, const laser_config& config) {
+	amcl::AMCLLaserData* pldata = new amcl::AMCLLaserData();
+	amcl::AMCLLaserData& ldata = *pldata;
   ldata.sensor = laser;
 
   pf_vector_t laser_pose;
@@ -596,7 +597,7 @@ inline amcl::AMCLLaserData convertLaser(amcl::AMCLLaser* laser, const RTC::Range
     // Compute bearing
     ldata.ranges[i][1] = angle_min + (i * angle_increment);
   }
-  return ldata;
+  return pldata;
 }
 
 inline map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
