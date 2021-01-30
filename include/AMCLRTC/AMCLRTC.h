@@ -606,8 +606,8 @@ inline map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
   map->size_x = ogmap.config.sizeOfMap.w / ogmap.config.sizeOfGrid.w;
   map->size_y = ogmap.config.sizeOfMap.l / ogmap.config.sizeOfGrid.l;
   map->scale = ogmap.config.sizeOfGrid.w;
-  map->origin_x = -ogmap.config.globalPositionOfTopLeft.position.x + (map->size_x / 2) * map->scale;
-  map->origin_y = -ogmap.config.globalPositionOfTopLeft.position.y + (map->size_y / 2) * map->scale;
+  map->origin_x = ogmap.config.globalPositionOfTopLeft.position.x + (map->size_x / 2) * map->scale;
+  map->origin_y = ogmap.config.globalPositionOfTopLeft.position.y + (map->size_y / 2) * map->scale;
   std::cout << "convertMap:" << std::endl;
   std::cout << " size_x: " << map->size_x << std::endl;
   std::cout << " size_y: " << map->size_y << std::endl;
