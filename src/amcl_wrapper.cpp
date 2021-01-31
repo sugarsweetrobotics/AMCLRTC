@@ -2,6 +2,10 @@
 #define _USE_MATH_DEFINED
 #include <math.h>
 
+#ifdef WIN32
+#include "portable_utils.hpp"
+#endif
+
 #include <iostream>
 #include <fstream>
 
@@ -84,7 +88,7 @@ amcl::AMCLLaser* initLaser(const laser_config& config, map_t* map) {
 #ifdef _DEBUG
   std::cout << "initLaser() called" << std::endl;
   std::cout << "laser_config: " << std::endl;
-  std::cout << "  model_type_str_ : " << config.model_type_str_ << std::endl;  
+  std::cout << "  model_type_str_ : " << config.model_type_str_.c_str() << std::endl;  
   std::cout << "  max_beams_      : " << config.max_beams_ << std::endl;
   std::cout << "  max_range_      : " << config.max_range_ << std::endl;
   std::cout << "  min_range_      : " << config.min_range_ << std::endl;
@@ -110,7 +114,7 @@ amcl::AMCLLaser* initLaser(const laser_config& config, map_t* map) {
   } else if (config.model_type_str_ == "likelihood_field_prob") {
     model_type_ = amcl::LASER_MODEL_LIKELIHOOD_FIELD_PROB;
   } else {
-    std::cout << "amcl_wrapper: initLaser failed. Unknown laser_model_type field. (" << config.model_type_str_ << std::endl;
+    std::cout << "amcl_wrapper: initLaser failed. Unknown laser_model_type field. (" << config.model_type_str_.c_str() << std::endl;
     return nullptr;
   }
 
@@ -160,7 +164,7 @@ amcl::AMCLOdom* initOdom(const odom_config& config) {
 #ifdef _DEBUG
   std::cout << "initOdom() called" << std::endl;
   std::cout << "odom_config :" << std::endl;
-  std::cout << "  model_type_str_ : " << config.model_type_str_ << std::endl;
+  std::cout << "  model_type_str_ : " << config.model_type_str_.c_str() << std::endl;
   std::cout << "  alpha1_ : " << config.alpha1_ << std::endl;
   std::cout << "  alpha2_ : " << config.alpha2_ << std::endl;
   std::cout << "  alpha3_ : " << config.alpha3_ << std::endl;
@@ -179,7 +183,7 @@ amcl::AMCLOdom* initOdom(const odom_config& config) {
   } else if (config.model_type_str_ == "omni-corrected") {
     model_type = amcl::ODOM_MODEL_OMNI_CORRECTED;
   } else {
-    std::cout << "initOdom failed. config file has invalid model type (" << config.model_type_str_ << std::endl;
+    std::cout << "initOdom failed. config file has invalid model type (" << config.model_type_str_.c_str() << std::endl;
     return nullptr;
   }
   
