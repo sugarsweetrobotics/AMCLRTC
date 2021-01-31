@@ -64,11 +64,11 @@ NAVIGATION::MCL_RETURN_STATUS NAVIGATION_MonteCarloLocalizationSVC_impl::resetPa
 
 NAVIGATION::MCL_RETURN_STATUS NAVIGATION_MonteCarloLocalizationSVC_impl::requestParticles(NAVIGATION::MCLInfo_out particles)
 {
-  std::cout << "MCLSVC::requestParticles called" << std::endl;
+  //  std::cout << "MCLSVC::requestParticles called" << std::endl;
   NAVIGATION::MCLInfo_var info(new NAVIGATION::MCLInfo());
   m_pRTC->setMCLInfo(info);
   particles = info._retn();
-  std::cout << "MCLSVC::requestParticles exit" << std::endl;
+  //  std::cout << "MCLSVC::requestParticles exit" << std::endl;
   return NAVIGATION::MCL_RETVAL_OK;
 }
 

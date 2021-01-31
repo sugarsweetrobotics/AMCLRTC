@@ -35,17 +35,19 @@ static const char* amclrtc_spec[] =
     "conf.default.update_min_d", "0.2",
     "conf.default.update_min_a", "0.5236",
     "conf.default.resample_interval", "2",
-    "conf.default.recovery_alpha_slow", "0.0",
-    "conf.default.recovery_alpha_fast", "0.0",
+    "conf.default.recovery_alpha_slow", "0.001",
+    "conf.default.recovery_alpha_fast", "0.1",
     "conf.default.initial_pose_x", "0.0",
     "conf.default.initial_pose_y", "0.0",
     "conf.default.initial_pose_a", "0.0",
     "conf.default.initial_cov_xx", "0.25",
     "conf.default.initial_cov_yy", "0.25",
     "conf.default.initial_cov_aa", "0.68535",
-    "conf.default.laser_min_range", "-1.0",
-    "conf.default.laser_max_range", "-1.0",
+
+    "conf.default.laser_model_type", "likelihood_field",
     "conf.default.laser_max_beams", "30",
+    "conf.default.laser_max_range", "-1.0",    
+    "conf.default.laser_min_range", "-1.0",
     "conf.default.laser_z_hit", "0.95",
     "conf.default.laser_z_short", "0.1",
     "conf.default.laser_z_max", "0.05",
@@ -53,7 +55,11 @@ static const char* amclrtc_spec[] =
     "conf.default.laser_sigma_hit", "0.2",
     "conf.default.laser_lambda_short", "0.1",
     "conf.default.laser_likelihood_max_dist", "2.0",
-    "conf.default.laser_model_type", "likelihood_field",
+    "conf.default.laser_likelihood_do_beamskip", "false",
+    "conf.default.laser_likelihood_beam_skip_distance", "0.5",
+    "conf.default.laser_likelihood_beam_skip_threshold", "0.3",
+    "conf.default.laser_likelihood_beam_skip_error_threshold", "0.9",
+    
     "conf.default.odom_model_type", "diff",
     "conf.default.odom_alpha1", "0.2",
     "conf.default.odom_alpha2", "0.2",    
@@ -134,7 +140,7 @@ inline pf_vector_t diff(const RTC::Pose2D& x0, const RTC::Pose2D& x1) {
 
 
 bool checkNeedUpdate(const pf_vector_t& delta, const pf_config& config) {
-  std::cout << "checkNeedUpdate(config=(" << config.d_thresh_ << "," << config.a_thresh_ << ")" << std::endl;
+  //  std::cout << "checkNeedUpdate(config=(" << config.d_thresh_ << "," << config.a_thresh_ << ")" << std::endl;
   return (fabs(delta.v[0]) > config.d_thresh_ ||
 	  fabs(delta.v[1]) > config.d_thresh_ ||
 	  fabs(delta.v[2]) > config.a_thresh_);
@@ -174,12 +180,12 @@ inline bool estimatePose(pf_t* pf, RTC::Pose2D& estimatedPose) {
     std::cout << " - max weight is negative... failed." << std::endl;
     return false;
   }
-  std::cout << " - max_weight = " << max_weight << std::endl;
+  //  std::cout << " - max_weight = " << max_weight << std::endl;
 
   estimatedPose.position.x = hyps[max_weight_count].pf_pose_mean.v[0];
   estimatedPose.position.y = hyps[max_weight_count].pf_pose_mean.v[1];
   estimatedPose.heading = hyps[max_weight_count].pf_pose_mean.v[2];
-  std::cout << " - estimatedPose is (" << estimatedPose.position.x << "," << estimatedPose.position.y << "," << estimatedPose.heading << ")" << std::endl;
+  //  std::cout << " - estimatedPose is (" << estimatedPose.position.x << "," << estimatedPose.position.y << "," << estimatedPose.heading << ")" << std::endl;
   return true;
 }
 
@@ -190,14 +196,19 @@ bool AMCLRTC::handleScan() {
   const pf_vector_t delta = diff(m_robotPose.data, m_receivedPoseWhenUpdated.data);
   // std::cout << "PoseDelta(" << delta.v[0] << "," << delta.v[1] << "," << delta.v[2] << ")" << std::endl;
 
+  double tm_robot = m_robotPose.tm.sec + m_robotPose.tm.nsec / 1000000000.0;
   amcl::AMCLOdomData odata;
   odata.pose = convertPose(m_robotPose.data);
   odata.delta = diff(m_robotPose.data, m_oldPose.data);
   odom_->UpdateAction(pf_, (amcl::AMCLSensorData*)&odata);
-  
+
+  double tm_laser = m_range.tm.sec + m_range.tm.nsec / 1000000000.0;
+
+
+  std::cout << "DEBUG: Timestamp diff is " << tm_laser - tm_robot << std::endl;
   amcl::AMCLLaserData* laserData = convertLaser(laser_, m_range, laser_config_);
   laser_->UpdateSensor(pf_, (amcl::AMCLSensorData*)laserData);
-  delete laserData;
+  // delete laserData;
   const bool needUpdatePF = checkNeedUpdate(delta, pf_config_);
   if (needUpdatePF) {
     std::cout <<" - needUpdatePF" << std::endl;
@@ -217,20 +228,14 @@ bool AMCLRTC::handleScan() {
   return false;
 }
 
-void AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
+bool AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
   //const nav_msgs::OccupancyGrid& msg;
   //boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
-  std::cout << "AMCLRTC::handleMapMessage() called" << std::endl;
+  //  std::cout << "AMCLRTC::handleMapMessage() called" << std::endl;
   auto pixel_x = map.config.sizeOfMap.w / map.config.sizeOfGrid.w;
   auto pixel_y = map.config.sizeOfMap.l / map.config.sizeOfGrid.l;
   RTC_INFO(("AMCLRTC::handleMapMessage(map w=%d,h=%d)", pixel_x, pixel_y));
   freeMapDependentMemory();
-  
-  // Clear queued laser objects because they hold pointers to the existing
-  // map, #5202.
-  //lasers_.clear();
-  //lasers_update_.clear();
-  //frame_to_laser_.clear();
 
   map_ = convertMap(map);
 
@@ -242,23 +247,24 @@ void AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
       if(map_->cells[MAP_INDEX(map_,i,j)].occ_state == -1)
         free_space_indices.push_back(std::make_pair(i,j));
 #endif
+  
   // Create the particle filter
   delete pf_;
   pf_ = initPF(pf_config_, map_);
-  //  pf_init_ = false;  
-  // Instantiate the sensor objects
+  
   // Odometry
   delete odom_;
-  odom_config_.model_type_ = amcl::ODOM_MODEL_DIFF;
   odom_ = initOdom(odom_config_);
+  
   // Laser
   delete laser_;
-  laser_config_.model_type_ = amcl::LASER_MODEL_LIKELIHOOD_FIELD;
   laser_ = initLaser(laser_config_, map_);
   
   // In case the initial pose message arrived before the first map,
   // try to apply the initial pose now that the map has arrived.
   // applyInitialPose();
+
+  return true;
 }
 
 RTC::ReturnCode_t AMCLRTC::onInitialize()
@@ -304,8 +310,11 @@ RTC::ReturnCode_t AMCLRTC::onInitialize()
   bindParameter("initial_cov_xx", pf_config_.init_cov_[0], "0.25");
   bindParameter("initial_cov_yy", pf_config_.init_cov_[1], "0.25");
   bindParameter("initial_cov_aa", pf_config_.init_cov_[2], "0.068535");
-  bindParameter("laser_min_range", laser_config_.min_range_, "-1.0");
+  
+  bindParameter("laser_max_beams", laser_config_.max_beams_, "30");
+  bindParameter("laser_model_type", laser_config_.model_type_str_, "likelihood_field");  
   bindParameter("laser_max_range", laser_config_.max_range_, "-1.0");
+  bindParameter("laser_min_range", laser_config_.min_range_, "-1.0");
   bindParameter("laser_z_hit", laser_config_.z_hit_, "0.95");
   bindParameter("laser_z_short", laser_config_.z_short_, "0.1");
   bindParameter("laser_z_max", laser_config_.z_max_, "0.05");
@@ -313,7 +322,11 @@ RTC::ReturnCode_t AMCLRTC::onInitialize()
   bindParameter("laser_sigma_hit", laser_config_.sigma_hit_, "0.2");
   bindParameter("laser_lambda_short", laser_config_.lambda_short_, "0.1");
   bindParameter("laser_likelihood_max_dist", laser_config_.likelihood_model_.max_dist_, "2.0");
-  bindParameter("laser_model_type", laser_config_.model_type_str_, "likelihood_field");
+  bindParameter("laser_likelihood_do_beamskip_", laser_config_.likelihood_model_.do_beamskip_, "false");
+  bindParameter("laser_likelihood_beam_skip_distance", laser_config_.likelihood_model_.beam_skip_distance_, "0.5");
+  bindParameter("laser_likelihood_beam_skip_threshold", laser_config_.likelihood_model_.beam_skip_threshold_, "0.3");
+  bindParameter("laser_likelihood_beam_skip_error_threshold", laser_config_.likelihood_model_.beam_skip_error_threshold_, "0.9");
+  
   bindParameter("odom_model_type", odom_config_.model_type_str_, "diff");
   bindParameter("odom_alpha1", odom_config_.alpha1_, "0.2");
   bindParameter("odom_alpha2", odom_config_.alpha2_, "0.2");
@@ -363,8 +376,15 @@ RTC::ReturnCode_t AMCLRTC::onActivated(RTC::UniqueId ec_id)
   std::cout << "AMCLRTC: - requesting map..." << std::endl;
   auto retval = m_NAVIGATION_OccupancyGridMapServer->requestLocalMap(param, map);
   std::cout << "AMCLRTC: reust map result is " << retval << std::endl;
+  if (retval != NAVIGATION::MAP_RETVAL_OK) {
+    std::cout << "AMCLRTC: Failed to acquire map" << std::endl;
+    return RTC::RTC_ERROR; 
+  }
 
-  handleMapMessage(map);
+  if (!handleMapMessage(map)) {
+    std::cout << "AMCLRTC: failed to handleMapMessage." << std::endl;
+    return RTC::RTC_ERROR;
+  }
   std::cout << "AMCLRTC: waiting for RobotPose data is received." << std::endl;  
   while(!m_robotPoseIn.isNew()) {
     //    std::cout << "AMCLRTC: waiting for RobotPose data is received." << std::endl;
@@ -378,11 +398,11 @@ RTC::ReturnCode_t AMCLRTC::onActivated(RTC::UniqueId ec_id)
   }
   m_rangeIn.read();
   
-  m_estimatedPose.data.position.x = m_initial_pose_x;
-  m_estimatedPose.data.position.y = m_initial_pose_y;
-  m_estimatedPose.data.heading = m_initial_pose_th;
-
+  m_estimatedPose.data.position.x = pf_config_.init_pose_[0];
+  m_estimatedPose.data.position.y = pf_config_.init_pose_[1];
+  m_estimatedPose.data.heading    = pf_config_.init_pose_[2];
   setTimestamp(m_estimatedPose);
+  std::cout << " - estimatedPose is (" << m_estimatedPose.data.position.x << "," << m_estimatedPose.data.position.y << "," << m_estimatedPose.data.heading << ")" << std::endl;  
   m_estimatedPoseOut.write();
 
   std::cout << "AMCLRTC::onActivated() exit" << std::endl;
@@ -408,6 +428,8 @@ RTC::ReturnCode_t AMCLRTC::onExecute(RTC::UniqueId ec_id)
       //m_oldPose = m_estimatedPose;
     }
     setTimestamp(m_estimatedPose);
+    //std::cout << " - estimatedPose is (" << m_estimatedPose.data.position.x << "," << m_estimatedPose.data.position.y << "," << m_estimatedPose.data.heading << ")" << std::endl;      
+
     m_estimatedPoseOut.write();
   }
 

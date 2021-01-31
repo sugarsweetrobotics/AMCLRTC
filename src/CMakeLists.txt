@@ -1,4 +1,4 @@
-set(comp_srcs AMCLRTC.cpp MobileRobotNavigationSVC_impl.cpp )
+set(comp_srcs AMCLRTC.cpp MobileRobotNavigationSVC_impl.cpp amcl_wrapper.cpp )
 set(standalone_srcs AMCLRTCComp.cpp)
 
 if(${OPENRTM_VERSION_MAJOR} LESS 2)
