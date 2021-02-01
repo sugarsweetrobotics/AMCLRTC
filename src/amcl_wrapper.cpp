@@ -48,7 +48,7 @@ map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
   map->size_y = ogmap.config.sizeOfMap.l / ogmap.config.sizeOfGrid.l;
   map->scale = ogmap.config.sizeOfGrid.w;
   map->origin_x = ogmap.config.globalPositionOfTopLeft.position.x + map->size_x / 2 * map->scale;
-  map->origin_y = -ogmap.config.globalPositionOfTopLeft.position.y + map->size_y / 2 * map->scale; 
+  map->origin_y = -(ogmap.config.globalPositionOfTopLeft.position.y - map->size_y / 2 * map->scale); 
 
 #ifdef _DEBUG
   std::cout << "ogmap :" << std::endl;
@@ -214,9 +214,9 @@ static pf_vector_t uniformPoseGenerator(void* arg)
 #else
   double min_x, max_x, min_y, max_y;
 
-  min_x = (map->size_x * map->scale)/2.0 - map->origin_x;
+  min_x = map->origin_x - (map->size_x * map->scale) / 2.0;
   max_x = (map->size_x * map->scale)/2.0 + map->origin_x;
-  min_y = (map->size_y * map->scale)/2.0 - map->origin_y;
+  min_y = map->origin_y - (map->size_y * map->scale) / 2.0;
   max_y = (map->size_y * map->scale)/2.0 + map->origin_y;
 
   pf_vector_t p;
@@ -227,8 +227,7 @@ static pf_vector_t uniformPoseGenerator(void* arg)
     p.v[1] = min_y + drand48() * (max_y - min_y);
     p.v[2] = drand48() * 2 * M_PI - M_PI;
     // Check that it's a free cell
-    int i,j;
-    i = MAP_GXWX(map, p.v[0]);
+    int i,j;    i = MAP_GXWX(map, p.v[0]);
     j = MAP_GYWY(map, p.v[1]);
     if(MAP_VALID(map,i,j) && (map->cells[MAP_INDEX(map,i,j)].occ_state == -1))
       break;
@@ -315,27 +314,30 @@ amcl::AMCLLaserData* convertLaser(amcl::AMCLLaser* laser, const RTC::RangeData& 
   ldata.ranges = new double[ldata.range_count][2];
 
   bool inv_rotate = false;
-  for(int i = 0;i < ldata.range_count;i++) {
+  long range_count = 0;
+  for(int i = 0;i < range.ranges.length();i++) {
     // amcl doesn't (yet) have a concept of min range.  So we'll map short
     // readings to max range.
     if(range.ranges[i] <= range_min) {
+		/*
       if (inv_rotate) {
-	ldata.ranges[ldata.range_count - i - 1][0] = ldata.range_max;
+		ldata.ranges[ldata.range_count - i - 1][0] = ldata.range_max;
       } else {
-	ldata.ranges[i][0] = ldata.range_max;
-      }
+		ldata.ranges[i][0] = ldata.range_max;
+      } */
     } else {
       if (inv_rotate) {
-	ldata.ranges[ldata.range_count - i - 1][0] = range.ranges[i];
+        ldata.ranges[ldata.range_count - range_count - 1][0] = range.ranges[i];
       } else {
-	ldata.ranges[i][0] = range.ranges[i];
+	    ldata.ranges[range_count][0] = range.ranges[i];
       }
-
+	  //    std::cout << "range: " << ldata.ranges[i][0] << std::endl;
+	  // Compute bearing
+	  ldata.ranges[range_count][1] = -(angle_min + (i * angle_increment));
+	  range_count++;
     }
-    //    std::cout << "range: " << ldata.ranges[i][0] << std::endl;
-    // Compute bearing
-    ldata.ranges[i][1] = -( angle_min + (i * angle_increment) );
   }
+  ldata.range_count = range_count;
   return pldata;
 }
 

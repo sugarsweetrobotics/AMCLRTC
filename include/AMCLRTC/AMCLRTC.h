@@ -379,29 +379,7 @@ private:
   }
 
 public:
-  bool setMCLInfo(NAVIGATION::MCLInfo_var& info) {
-    //s td::lock_guard<std::mutex> guard(m_pf_lock);
-    //  std::cout << "[AMCLRTC::setMCLInfo called" << std::endl;
-    const pf_sample_set_t& set = pf_->sets[pf_->current_set];
-    const long len = set.sample_count;
-    info->particles.length(len);
-    double maxWeight = -1;
-    int maxWeightIndex = -1;
-    for(int i = 0;i < len;i++) {
-      info->particles[i].pose.position.x = set.samples[i].pose.v[0];
-      info->particles[i].pose.position.y = set.samples[i].pose.v[1];
-      info->particles[i].pose.heading    = set.samples[i].pose.v[2];
-      info->particles[i].weight          = set.samples[i].weight;
-      if (maxWeight < set.samples[i].weight) {
-	maxWeight = set.samples[i].weight;
-	maxWeightIndex = i;
-      }
-      info->maxWeight = maxWeight;
-      info->maxWeightIndex = maxWeightIndex;
-    }
-    return true;
-  }
-
+	bool setMCLInfo(NAVIGATION::MCLInfo_var& info);
 };
 
 

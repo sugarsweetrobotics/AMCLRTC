@@ -28,7 +28,7 @@ static const char* amclrtc_spec[] =
     // Configuration variables
     "conf.default.debug_level", "1",
 
-    "conf.default.min_particles", "100",
+    "conf.default.min_particles", "500",
     "conf.default.max_particles", "5000",
     "conf.default.kld_err", "0.01",
     "conf.default.kld_z", "0.99",
@@ -49,12 +49,12 @@ static const char* amclrtc_spec[] =
     "conf.default.laser_max_range", "-1.0",    
     "conf.default.laser_min_range", "-1.0",
     "conf.default.laser_z_hit", "0.95",
-    "conf.default.laser_z_short", "0.1",
-    "conf.default.laser_z_max", "0.05",
-    "conf.default.laser_z_rand", "0.05",
-    "conf.default.laser_sigma_hit", "0.2",
-    "conf.default.laser_lambda_short", "0.1",
-    "conf.default.laser_likelihood_max_dist", "2.0",
+    "conf.default.laser_z_short", "0.r",
+    "conf.default.laser_z_max", "0.1",
+    "conf.default.laser_z_rand", "0.1",
+    "conf.default.laser_sigma_hit", "0.4",
+    "conf.default.laser_lambda_short", "0.2",
+    "conf.default.laser_likelihood_max_dist", "4.0",
     "conf.default.laser_likelihood_do_beamskip", "false",
     "conf.default.laser_likelihood_beam_skip_distance", "0.5",
     "conf.default.laser_likelihood_beam_skip_threshold", "0.3",
@@ -110,16 +110,16 @@ AMCLRTC::~AMCLRTC()
 inline pf_vector_t convertPose(const RTC::Pose2D& x) {
   pf_vector_t d;
   d.v[0] = x.position.x;
-  d.v[1] = x.position.y;
-  d.v[2] = x.heading;
+  d.v[1] = -x.position.y;
+  d.v[2] = -x.heading;
   return d;
 }
 
 inline RTC::Pose2D convertPose(const pf_vector_t& x) {
   RTC::Pose2D d;
   d.position.x = x.v[0];
-  d.position.y = x.v[1];
-  d.heading = x.v[2];
+  d.position.y = -x.v[1];
+  d.heading = -x.v[2];
   return d;
 }
 
@@ -133,8 +133,8 @@ inline double angular_diff(const double x, const double y) {
 inline pf_vector_t diff(const RTC::Pose2D& x0, const RTC::Pose2D& x1) {
   pf_vector_t delta = pf_vector_zero();
   delta.v[0] = x0.position.x - x1.position.x;
-  delta.v[1] = x0.position.y - x1.position.y;
-  delta.v[2] = angular_diff(x0.heading, x1.heading);
+  delta.v[1] = -(x0.position.y - x1.position.y);
+  delta.v[2] = -angular_diff(x0.heading, x1.heading);
   return delta;
 }
 
@@ -182,11 +182,33 @@ inline bool estimatePose(pf_t* pf, RTC::Pose2D& estimatedPose) {
   }
   //  std::cout << " - max_weight = " << max_weight << std::endl;
 
-  estimatedPose.position.x = hyps[max_weight_count].pf_pose_mean.v[0];
-  estimatedPose.position.y = hyps[max_weight_count].pf_pose_mean.v[1];
-  estimatedPose.heading = hyps[max_weight_count].pf_pose_mean.v[2];
+  estimatedPose = convertPose(hyps[max_weight_count].pf_pose_mean);
+  //estimatedPose.position.x = hyps[max_weight_count].pf_pose_mean.v[0];
+  //estimatedPose.position.y = -hyps[max_weight_count].pf_pose_mean.v[1];
+  //estimatedPose.heading = hyps[max_weight_count].pf_pose_mean.v[2];
   //  std::cout << " - estimatedPose is (" << estimatedPose.position.x << "," << estimatedPose.position.y << "," << estimatedPose.heading << ")" << std::endl;
   return true;
+}
+
+bool AMCLRTC::setMCLInfo(NAVIGATION::MCLInfo_var& info) {
+	//s td::lock_guard<std::mutex> guard(m_pf_lock);
+	//  std::cout << "[AMCLRTC::setMCLInfo called" << std::endl;
+	const pf_sample_set_t& set = pf_->sets[pf_->current_set];
+	const long len = set.sample_count;
+	info->particles.length(len);
+	double maxWeight = -1;
+	int maxWeightIndex = -1;
+	for (int i = 0; i < len; i++) {
+		info->particles[i].pose = convertPose(set.samples[i].pose);
+		info->particles[i].weight = set.samples[i].weight;
+		if (maxWeight < set.samples[i].weight) {
+			maxWeight = set.samples[i].weight;
+			maxWeightIndex = i;
+		}
+		info->maxWeight = maxWeight;
+		info->maxWeightIndex = maxWeightIndex;
+	}
+	return true;
 }
 
 bool AMCLRTC::handleScan() {
@@ -196,6 +218,12 @@ bool AMCLRTC::handleScan() {
   const pf_vector_t delta = diff(m_robotPose.data, m_receivedPoseWhenUpdated.data);
   // std::cout << "PoseDelta(" << delta.v[0] << "," << delta.v[1] << "," << delta.v[2] << ")" << std::endl;
 
+
+  double x = m_estimatedPose.data.position.x;
+  double y = m_estimatedPose.data.position.y;
+  double a = m_estimatedPose.data.heading;
+
+
   double tm_robot = m_robotPose.tm.sec + m_robotPose.tm.nsec / 1000000000.0;
   amcl::AMCLOdomData odata;
   odata.pose = convertPose(m_robotPose.data);
@@ -203,9 +231,11 @@ bool AMCLRTC::handleScan() {
   odom_->UpdateAction(pf_, (amcl::AMCLSensorData*)&odata);
 
   double tm_laser = m_range.tm.sec + m_range.tm.nsec / 1000000000.0;
+  m_oldPose = m_robotPose;
 
 
-  std::cout << "DEBUG: Timestamp diff is " << tm_laser - tm_robot << std::endl;
+
+  //std::cout << "DEBUG: Timestamp diff is " << tm_laser - tm_robot << std::endl;
   amcl::AMCLLaserData* laserData = convertLaser(laser_, m_range, laser_config_);
   laser_->UpdateSensor(pf_, (amcl::AMCLSensorData*)laserData);
   // delete laserData;
@@ -214,16 +244,25 @@ bool AMCLRTC::handleScan() {
     std::cout <<" - needUpdatePF" << std::endl;
     pf_update_resample(pf_);
     if (estimatePose(pf_, m_estimatedPose.data)) {
-      m_receivedPoseWhenUpdated = m_robotPose;
-      return true;
+
+		double dx = m_estimatedPose.data.position.x - x;
+		double dy = m_estimatedPose.data.position.y - y;
+		double da = m_estimatedPose.data.heading - a;
+
+		if (sqrt(dx*dx + dy * dy) > 2) {
+			std::cout << "Wow! not continuous behaviouor detected." << std::endl;
+		}
+		else {
+
+		}
+		m_receivedPoseWhenUpdated = m_robotPose;
+		return true;
     }
   }
   
   m_estimatedPose.data.position.x = m_estimatedPose.data.position.x + odata.delta.v[0];
-  m_estimatedPose.data.position.y = m_estimatedPose.data.position.y + odata.delta.v[1];
-  m_estimatedPose.data.heading    = m_estimatedPose.data.heading + odata.delta.v[2];
-  
-  m_oldPose = m_robotPose;        
+  m_estimatedPose.data.position.y = m_estimatedPose.data.position.y - odata.delta.v[1];
+  m_estimatedPose.data.heading    = m_estimatedPose.data.heading    - odata.delta.v[2];
   
   return false;
 }
@@ -425,12 +464,14 @@ RTC::ReturnCode_t AMCLRTC::onExecute(RTC::UniqueId ec_id)
   if (m_rangeIn.isNew()) {
     m_rangeIn.read();
     if (handleScan()) {
-      //m_oldPose = m_estimatedPose;
+		//m_oldPose = m_estimatedPose;
+
     }
+	m_estimatedPoseOut.write();
     setTimestamp(m_estimatedPose);
     //std::cout << " - estimatedPose is (" << m_estimatedPose.data.position.x << "," << m_estimatedPose.data.position.y << "," << m_estimatedPose.data.heading << ")" << std::endl;      
 
-    m_estimatedPoseOut.write();
+   // m_estimatedPoseOut.write();
   }
 
   
