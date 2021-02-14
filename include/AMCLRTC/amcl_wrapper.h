@@ -1,5 +1,7 @@
 #pragma once
 
+#define _USE_MATH_DEFINES
+#include <math.h>
 #include "NavigationDataType.hh"
 
 #include "amcl/map/map.h"

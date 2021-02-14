@@ -34,6 +34,7 @@ include_directories(${PROJECT_BINARY_DIR})
 include_directories(${PROJECT_BINARY_DIR}/idl)
 include_directories(${OPENRTM_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/navigation_amcl/include)
+include_directories(${PROJECT_SOURCE_DIR}/navigation_amcl/src/amcl/include)
 add_definitions(${OPENRTM_CFLAGS})
 
 set(AMCL_LIBRARIES amcl)

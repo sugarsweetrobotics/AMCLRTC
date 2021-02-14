@@ -2,6 +2,10 @@
 #define _USE_MATH_DEFINED
 #include <math.h>
 
+#ifdef WIN32
+#include "portable_utils.hpp"
+#endif
+
 #include <iostream>
 #include <fstream>
 
@@ -44,7 +48,7 @@ map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
   map->size_y = ogmap.config.sizeOfGridMap.height;// / ogmap.config.sizeOfGrid.l;
   map->scale = ogmap.config.sizeOfGrid.width;
   map->origin_x = ogmap.config.globalPositionOfTopLeft.position.x + map->size_x / 2 * map->scale;
-  map->origin_y = -ogmap.config.globalPositionOfTopLeft.position.y + map->size_y / 2 * map->scale; 
+  map->origin_y = -(ogmap.config.globalPositionOfTopLeft.position.y - map->size_y / 2 * map->scale); 
 
 #ifdef _DEBUG
   std::cout << "ogmap :" << std::endl;
@@ -84,7 +88,7 @@ amcl::AMCLLaser* initLaser(const laser_config& config, map_t* map) {
 #ifdef _DEBUG
   std::cout << "initLaser() called" << std::endl;
   std::cout << "laser_config: " << std::endl;
-  std::cout << "  model_type_str_ : " << config.model_type_str_ << std::endl;  
+  std::cout << "  model_type_str_ : " << config.model_type_str_.c_str() << std::endl;  
   std::cout << "  max_beams_      : " << config.max_beams_ << std::endl;
   std::cout << "  max_range_      : " << config.max_range_ << std::endl;
   std::cout << "  min_range_      : " << config.min_range_ << std::endl;
@@ -110,7 +114,7 @@ amcl::AMCLLaser* initLaser(const laser_config& config, map_t* map) {
   } else if (config.model_type_str_ == "likelihood_field_prob") {
     model_type_ = amcl::LASER_MODEL_LIKELIHOOD_FIELD_PROB;
   } else {
-    std::cout << "amcl_wrapper: initLaser failed. Unknown laser_model_type field. (" << config.model_type_str_ << std::endl;
+    std::cout << "amcl_wrapper: initLaser failed. Unknown laser_model_type field. (" << config.model_type_str_.c_str() << std::endl;
     return nullptr;
   }
 
@@ -160,7 +164,7 @@ amcl::AMCLOdom* initOdom(const odom_config& config) {
 #ifdef _DEBUG
   std::cout << "initOdom() called" << std::endl;
   std::cout << "odom_config :" << std::endl;
-  std::cout << "  model_type_str_ : " << config.model_type_str_ << std::endl;
+  std::cout << "  model_type_str_ : " << config.model_type_str_.c_str() << std::endl;
   std::cout << "  alpha1_ : " << config.alpha1_ << std::endl;
   std::cout << "  alpha2_ : " << config.alpha2_ << std::endl;
   std::cout << "  alpha3_ : " << config.alpha3_ << std::endl;
@@ -179,7 +183,7 @@ amcl::AMCLOdom* initOdom(const odom_config& config) {
   } else if (config.model_type_str_ == "omni-corrected") {
     model_type = amcl::ODOM_MODEL_OMNI_CORRECTED;
   } else {
-    std::cout << "initOdom failed. config file has invalid model type (" << config.model_type_str_ << std::endl;
+    std::cout << "initOdom failed. config file has invalid model type (" << config.model_type_str_.c_str() << std::endl;
     return nullptr;
   }
   
@@ -210,9 +214,9 @@ static pf_vector_t uniformPoseGenerator(void* arg)
 #else
   double min_x, max_x, min_y, max_y;
 
-  min_x = (map->size_x * map->scale)/2.0 - map->origin_x;
+  min_x = map->origin_x - (map->size_x * map->scale) / 2.0;
   max_x = (map->size_x * map->scale)/2.0 + map->origin_x;
-  min_y = (map->size_y * map->scale)/2.0 - map->origin_y;
+  min_y = map->origin_y - (map->size_y * map->scale) / 2.0;
   max_y = (map->size_y * map->scale)/2.0 + map->origin_y;
 
   pf_vector_t p;
@@ -223,8 +227,7 @@ static pf_vector_t uniformPoseGenerator(void* arg)
     p.v[1] = min_y + drand48() * (max_y - min_y);
     p.v[2] = drand48() * 2 * M_PI - M_PI;
     // Check that it's a free cell
-    int i,j;
-    i = MAP_GXWX(map, p.v[0]);
+    int i,j;    i = MAP_GXWX(map, p.v[0]);
     j = MAP_GYWY(map, p.v[1]);
     if(MAP_VALID(map,i,j) && (map->cells[MAP_INDEX(map,i,j)].occ_state == -1))
       break;
@@ -311,27 +314,30 @@ amcl::AMCLLaserData* convertLaser(amcl::AMCLLaser* laser, const RTC::RangeData& 
   ldata.ranges = new double[ldata.range_count][2];
 
   bool inv_rotate = false;
-  for(int i = 0;i < ldata.range_count;i++) {
+  long range_count = 0;
+  for(int i = 0;i < range.ranges.length();i++) {
     // amcl doesn't (yet) have a concept of min range.  So we'll map short
     // readings to max range.
     if(range.ranges[i] <= range_min) {
+		/*
       if (inv_rotate) {
-	ldata.ranges[ldata.range_count - i - 1][0] = ldata.range_max;
+		ldata.ranges[ldata.range_count - i - 1][0] = ldata.range_max;
       } else {
-	ldata.ranges[i][0] = ldata.range_max;
-      }
+		ldata.ranges[i][0] = ldata.range_max;
+      } */
     } else {
       if (inv_rotate) {
-	ldata.ranges[ldata.range_count - i - 1][0] = range.ranges[i];
+        ldata.ranges[ldata.range_count - range_count - 1][0] = range.ranges[i];
       } else {
-	ldata.ranges[i][0] = range.ranges[i];
+	    ldata.ranges[range_count][0] = range.ranges[i];
       }
-
+	  //    std::cout << "range: " << ldata.ranges[i][0] << std::endl;
+	  // Compute bearing
+	  ldata.ranges[range_count][1] = -(angle_min + (i * angle_increment));
+	  range_count++;
     }
-    //    std::cout << "range: " << ldata.ranges[i][0] << std::endl;
-    // Compute bearing
-    ldata.ranges[i][1] = -( angle_min + (i * angle_increment) );
   }
+  ldata.range_count = range_count;
   return pldata;
 }
 
