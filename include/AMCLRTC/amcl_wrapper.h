@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MobileRobotNavigation.hh"
+#include "NavigationDataType.hh"
 
 #include "amcl/map/map.h"
 #include "amcl/pf/pf.h"

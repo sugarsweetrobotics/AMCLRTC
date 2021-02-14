@@ -9,7 +9,6 @@
 
 #include "AMCLRTC.h"
 
-
 // Module specification
 // <rtc-template block="module_spec">
 static const char* amclrtc_spec[] =
@@ -74,7 +73,6 @@ static const char* amclrtc_spec[] =
     "conf.__constraints__.laser_model_type", "(likelihood_field, beam, likelihood_field_prob)",
     "conf.__constraints__.odom_model_type", "(diff, omni, diff-corrected, omni-corrected)",
     "conf.__type__.debug_level", "long",
-
     ""
   };
 // </rtc-template>
@@ -84,13 +82,13 @@ static const char* amclrtc_spec[] =
  * @param manager Maneger Object
  */
 AMCLRTC::AMCLRTC(RTC::Manager* manager)
-// <rtc-template block="initializer">
-	: RTC::DataFlowComponentBase(manager),
-	m_robotPoseIn("robotPose", m_robotPose),
-	m_rangeIn("range", m_range),
-	m_estimatedPoseOut("estimatedPose", m_estimatedPose),
-	m_mclServicePort("mclService"),
-	m_mapServicePort("mapService"),
+    // <rtc-template block="initializer">
+  : RTC::DataFlowComponentBase(manager),
+    m_robotPoseIn("robotPose", m_robotPose),
+    m_rangeIn("range", m_range),
+    m_estimatedPoseOut("estimatedPose", m_estimatedPose),
+    m_mclServicePort("mclService"),
+    m_mapServicePort("mapService"),
 	map_(nullptr),
 	pf_(nullptr),
 	odom_(nullptr),
@@ -106,6 +104,8 @@ AMCLRTC::AMCLRTC(RTC::Manager* manager)
 AMCLRTC::~AMCLRTC()
 {
 }
+
+
 
 inline pf_vector_t convertPose(const RTC::Pose2D& x) {
   pf_vector_t d;
@@ -232,8 +232,8 @@ bool AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
   //const nav_msgs::OccupancyGrid& msg;
   //boost::recursive_mutex::scoped_lock cfl(configuration_mutex_);
   //  std::cout << "AMCLRTC::handleMapMessage() called" << std::endl;
-  auto pixel_x = map.config.sizeOfMap.w / map.config.sizeOfGrid.w;
-  auto pixel_y = map.config.sizeOfMap.l / map.config.sizeOfGrid.l;
+  auto pixel_x = map.config.sizeOfGridMap.width;// / map.config.sizeOfGrid.w;
+  auto pixel_y = map.config.sizeOfGridMap.height;// / map.config.sizeOfGrid.l;
   RTC_INFO(("AMCLRTC::handleMapMessage(map w=%d,h=%d)", pixel_x, pixel_y));
   freeMapDependentMemory();
 
@@ -267,6 +267,7 @@ bool AMCLRTC::handleMapMessage(const NAVIGATION::OccupancyGridMap& map) {
   return true;
 }
 
+
 RTC::ReturnCode_t AMCLRTC::onInitialize()
 {
   // Registration: InPort/OutPort/Service
@@ -288,14 +289,12 @@ RTC::ReturnCode_t AMCLRTC::onInitialize()
   addPort(m_mclServicePort);
   addPort(m_mapServicePort);
 
-  m_NAVIGATION_MonteCarloLocalization.setRTC(this);
   // </rtc-template>
 
+  m_NAVIGATION_MonteCarloLocalization.setRTC(this);
   // <rtc-template block="bind_config">
   // Bind variables and configuration variable
   bindParameter("debug_level", m_debug_level, "1");
-
-
   bindParameter("min_particles", pf_config_.min_particles_, "100");
   bindParameter("max_particles", pf_config_.max_particles_, "5000");
   bindParameter("kld_err", pf_config_.pf_err_, "0.01");
@@ -333,7 +332,6 @@ RTC::ReturnCode_t AMCLRTC::onInitialize()
   bindParameter("odom_alpha3", odom_config_.alpha3_, "0.2");
   bindParameter("odom_alpha4", odom_config_.alpha4_, "0.2");
   bindParameter("odom_alpha5", odom_config_.alpha5_, "0.2");  
-
   // </rtc-template>
 
   return RTC::RTC_OK;
@@ -369,14 +367,14 @@ RTC::ReturnCode_t AMCLRTC::onActivated(RTC::UniqueId ec_id)
   param.globalPositionOfCenter.position.x = 0;
   param.globalPositionOfCenter.position.y = 0;
   param.globalPositionOfCenter.heading = 0;
-  param.sizeOfMap.l = -1; // Negative Value ... Maximum Size.
-  param.sizeOfMap.w = -1; // Negative Value ... Maximum Size.
-  param.sizeOfGrid.l = 0.05;
-  param.sizeOfGrid.w = 0.05;
+  param.sizeOfMap.height = -1; // Negative Value ... Maximum Size.
+  param.sizeOfMap.width = -1; // Negative Value ... Maximum Size.
+  param.sizeOfGrid.height = 0.05;
+  param.sizeOfGrid.width = 0.05;
   std::cout << "AMCLRTC: - requesting map..." << std::endl;
   auto retval = m_NAVIGATION_OccupancyGridMapServer->requestLocalMap(param, map);
   std::cout << "AMCLRTC: reust map result is " << retval << std::endl;
-  if (retval != NAVIGATION::MAP_RETVAL_OK) {
+  if (retval != NAVIGATION::MAP_OK) {
     std::cout << "AMCLRTC: Failed to acquire map" << std::endl;
     return RTC::RTC_ERROR; 
   }
@@ -433,7 +431,6 @@ RTC::ReturnCode_t AMCLRTC::onExecute(RTC::UniqueId ec_id)
     m_estimatedPoseOut.write();
   }
 
-  
   return RTC::RTC_OK;
 }
 

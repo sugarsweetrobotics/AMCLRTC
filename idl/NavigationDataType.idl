@@ -1,0 +1,97 @@
+#ifndef NAVIGATION_DATA_TYPE_IDL_INCLUDED
+#define NAVIGATION_DATA_TYPE_INCLUDED
+
+
+#include "InterfaceDataTypes.idl"
+
+module NAVIGATION {
+
+  struct Size2D {
+    double width;
+    double height;
+  };
+  
+  struct GridPoint2D {
+    long x;
+    long y;
+  };
+  
+  struct GridPose2D {
+    GridPoint2D position;
+    double heading;
+  };
+  
+  struct GridSize2D {
+    long width;
+    long height;
+  };
+  
+  //// Data Types for Map
+  
+  /**
+   * Configuration of Map. Size, resolution, etc.
+   */
+  struct OccupancyGridMapConfig {
+    RTC::Pose2D globalPositionOfTopLeft; // Position in global coordinate of the top-left edge of the grid map. Unit: meter and radian.
+    Size2D sizeOfGrid; // Size of a grid. Unit: meter and radian
+    GridSize2D sizeOfGridMap;  // Size of whole map.
+  };
+
+  typedef sequence<octet> OccupancyGridMapCells;
+  // Cell data style of Occupancy grid map.
+  // Cell data is simple byte array.
+  // But usually, grid data has at most 4 patterns.
+  // So, the grid data can be reduced into 2 bits without any loss.
+  enum MAP_DATA_STYLE {
+    MAP_DATA_CELL_IS_BYTE, // Usual byte style representation
+    MAP_DATA_CELL_IS_2BIT  // Minimal size
+  };
+
+  const long MAP_BYTE_CELL_OCCUPIED_STATE = 0;
+  const long MAP_BYTE_CELL_UNKNOWN_STATE = 125;
+  const long MAP_BYTE_CELL_NO_INFO = 124;
+  const long MAP_BYTE_CELL_FREE_STATE = 255;
+
+  const long MAP_2BIT_CELL_OCCUPIED_STATE = 0;
+  const long MAP_2BIT_CELL_UNKNOWN_STATE = 1;
+  const long MAP_2BIT_CELL_NO_INFO = 2;
+  const long MAP_2BIT_CELL_FREE_STATE = 3;
+
+  /**
+   * Map data
+   */
+  struct OccupancyGridMap {
+    MAP_DATA_STYLE style; /// Representation of map data.
+    OccupancyGridMapCells cells; /// Map cell data.
+    OccupancyGridMapConfig config; /// Map config data.
+  };
+
+
+  /// Path data
+  struct Waypoint2D {
+    RTC::Pose2D pose; /// Location of the waypoint.
+    double distanceTolerance; /// How far away from the waypoint is considered success (radius in metres).
+    double headingTolerance; /// How much off the target heading is considered success (in radians).
+    RTC::Time timeLimit; /// Target time to arrive at the waypoint by.
+    RTC::Velocity2D maxSpeed; /// Maximum sped to travel at while heading to the waypoint.
+    string annotation; /// Note for this point. This string value can include "Name of point", "Special command at this point", "JSON data", etc.
+  };
+
+  /**
+   * @typedef Waypoint2DList
+   */
+  typedef sequence<Waypoint2D> Waypoint2DList;
+
+
+  /**
+   * @struct Path2D
+   * @brief A time-stamped path in 2D space.
+   */
+  struct Path2D {
+    RTC::Time tm; /// Time stamp.
+    Waypoint2DList waypoints; /// The sequence of waypoints that make up the path.
+  };
+
+};
+
+#endif // NAVIGATION_DATA_TYPE_INCLUDED

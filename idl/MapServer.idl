@@ -1,0 +1,54 @@
+#ifndef MAP_SERVER_IDL_INCLUDED
+#define MAP_SERVER_IDL_INCLUDED
+
+#include "NavigationDataType.idl"
+
+module NAVIGATION {
+
+  /**
+   *
+   */
+  enum MAP_RETURN_STATUS {
+    MAP_OK,
+    MAP_NG_CANNOTLOADMAP,
+    MAP_NG_REQUESTOUTOFRANGE,
+    MAP_NG_NOTSUPPORTEDRESOLUTION,
+    MAP_NG_NOTSUPPORTEDFUNCTION,
+    MAP_NG_EMPTY_MAP,
+    MAP_NG_INVALID_PARAMETER,
+    MAP_NG_INVALID_PRECONDITION,
+    MAP_NG_UNKNOWN,
+    MAP_NG_NOTIMPL
+  };
+
+  /**
+   * @struct OccupancyGridMapRequestParam
+   */
+  struct OccupancyGridMapRequestParam {
+    RTC::Pose2D globalPositionOfCenter; /// Center position of map requesting
+    Size2D sizeOfMap; /// Size of map. Unit meter and radian
+    Size2D sizeOfGrid; /// Size of a grid. Unit meter and radian.
+    MAP_DATA_STYLE style; /// Map representation style. 1 byte / grid or 2 bits / grid. See NavigationDataType.idl
+  };
+
+  /**
+   * @interface OccupancyGridMapServer
+   */
+  interface OccupancyGridMapServer {
+  
+    MAP_RETURN_STATUS updateLocalMap(in OccupancyGridMapRequestParam param, in OccupancyGridMap map);
+
+    MAP_RETURN_STATUS updateWholeMap(in OccupancyGridMapRequestParam param, in OccupancyGridMap map);
+
+    MAP_RETURN_STATUS requestLocalMap(in OccupancyGridMapRequestParam param, out OccupancyGridMap map);
+
+    MAP_RETURN_STATUS getWholeMapConig(out OccupancyGridMapConfig config);
+  };
+
+  interface OccupancyGridMapClient {
+    MAP_RETURN_STATUS notifyUpdateMap(in OccupancyGridMapConfig config); 
+  };
+
+};
+
+#endif // MAP_SERVER_IDL_INCLUDED

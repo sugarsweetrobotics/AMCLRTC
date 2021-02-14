@@ -16,6 +16,7 @@
 
 // Service implementation headers
 // <rtc-template block="service_impl_h">
+#include "MapServerSVC_impl.h"
 #include "ExtendedDataTypesSVC_impl.h"
 #include "InterfaceDataTypesSVC_impl.h"
 
@@ -23,7 +24,7 @@
 
 // Service Consumer stub headers
 // <rtc-template block="consumer_stub_h">
-#include "MobileRobotNavigationStub.h"
+#include "MCLStub.h"
 
 // </rtc-template>
 

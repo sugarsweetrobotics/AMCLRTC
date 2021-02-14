@@ -10,12 +10,10 @@
 #ifndef AMCLRTC_H
 #define AMCLRTC_H
 
-
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <mutex>
 #include <algorithm>
-
 
 #include <rtm/idl/BasicDataTypeSkel.h>
 #include <rtm/idl/ExtendedDataTypesSkel.h>
@@ -23,12 +21,13 @@
 
 // Service implementation headers
 // <rtc-template block="service_impl_h">
-#include "MobileRobotNavigationSVC_impl.h"
+#include "MCLSVC_impl.h"
 
 // </rtc-template>
 
 // Service Consumer stub headers
 // <rtc-template block="consumer_stub_h">
+#include "MapServerStub.h"
 #include "ExtendedDataTypesStub.h"
 #include "InterfaceDataTypesStub.h"
 
@@ -41,12 +40,6 @@
 #include <rtm/DataOutPort.h>
 
 #include "amcl_wrapper.h"
-
-
-
-
-
-
 /*!
  * @class AMCLRTC
  * @brief Adaptive Monte Carlo Localization (AMCL) module
@@ -401,13 +394,7 @@ public:
     }
     return true;
   }
-
 };
-
-
-
-
-
 
 
 extern "C"

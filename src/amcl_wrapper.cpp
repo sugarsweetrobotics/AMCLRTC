@@ -40,9 +40,9 @@ map_t* convertMap(const NAVIGATION::OccupancyGridMap& ogmap) {
   if (!map) {
     return nullptr;
   }
-  map->size_x = ogmap.config.sizeOfMap.w / ogmap.config.sizeOfGrid.w;
-  map->size_y = ogmap.config.sizeOfMap.l / ogmap.config.sizeOfGrid.l;
-  map->scale = ogmap.config.sizeOfGrid.w;
+  map->size_x = ogmap.config.sizeOfGridMap.width;// / ogmap.config.sizeOfGrid.w;
+  map->size_y = ogmap.config.sizeOfGridMap.height;// / ogmap.config.sizeOfGrid.l;
+  map->scale = ogmap.config.sizeOfGrid.width;
   map->origin_x = ogmap.config.globalPositionOfTopLeft.position.x + map->size_x / 2 * map->scale;
   map->origin_y = -ogmap.config.globalPositionOfTopLeft.position.y + map->size_y / 2 * map->scale; 
 

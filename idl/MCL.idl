@@ -1,0 +1,81 @@
+#ifndef MCL_IDL_INCLUDED
+#define MCL_IDL_INCLUDED
+
+#include "NavigationDataType.idl"
+
+module NAVIGATION {
+  //// Monte Carlo Localization
+  /**
+   * Particle Information.
+   * This struct is specialized for Monte-Carlo Localization.
+   */
+  struct MCLParticle {
+    
+    RTC::Pose2D pose; // 3D Pose. This might be redundant.
+    
+    double weight;
+  };
+  typedef sequence<MCLParticle> MCLParticleList;
+
+  /**
+   * Key Value pair.
+   */
+  struct MCLConfigKeyValue {
+    string key;
+    string value;
+  };
+  typedef sequence<MCLConfigKeyValue> MCLConfigMap;
+  
+
+  /**
+   *
+   */
+  struct MCLInfo {
+
+    MCLParticleList particles; // All Particle Information
+
+    double maxWeight;
+    unsigned long maxWeightIndex;
+    double minWeight;
+    unsigned long minWeightIndex;
+
+    RTC::Pose2D meanPose;
+    RTC::Covariance2D covaliance;
+  };
+  
+  enum MCL_RETURN_STATUS {
+    MCL_RETVAL_OK,
+    MCL_RETVAL_NG_MAPISNOTSET,
+    MCL_RETVAL_NG_MAPISINVALID,
+    MCL_RETVAL_NG_UNKNOWN,
+    MCL_RETVAL_NG_NOTIMPL
+  };
+
+  struct ParticleResetParam {
+
+    RTC::Pose2D meanPose;
+
+    RTC::Covariance2D covariance;
+
+    unsigned long numOfParticles;
+
+  };
+  
+  /**
+   * Interface for Service Port of MCL (Monte Carlo Localization
+   */
+  interface MonteCarloLocalization {
+
+    MCL_RETURN_STATUS resetParticles(in ParticleResetParam param);
+    
+    MCL_RETURN_STATUS requestParticles(out MCLInfo particles);
+    
+    MCL_RETURN_STATUS setParticles(in MCLInfo particles);
+
+    MCL_RETURN_STATUS updateMap(in OccupancyGridMap map);
+  };
+
+};
+
+
+#endif // MCL_IDL_INCLUDED

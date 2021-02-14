@@ -1,4 +1,4 @@
-set(idls ${CMAKE_CURRENT_SOURCE_DIR}/MobileRobotNavigation.idl )
+set(idls ${CMAKE_CURRENT_SOURCE_DIR}/MCL.idl ${CMAKE_CURRENT_SOURCE_DIR}/MapServer.idl ${CMAKE_CURRENT_SOURCE_DIR}/NavigationDataType.idl )
 
 macro(_IDL_OUTPUTS _idl _dir _result)
     set(${_result} ${_dir}/${_idl}Skel.cpp ${_dir}/${_idl}Skel.h)
