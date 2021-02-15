@@ -36,9 +36,9 @@ module NAVIGATION {
    */
   interface OccupancyGridMapServer {
   
-    MAP_RETURN_STATUS updateLocalMap(in OccupancyGridMapRequestParam param, in OccupancyGridMap map);
+    MAP_RETURN_STATUS updateLocalMap(in OccupancyGridMap map);
 
-    MAP_RETURN_STATUS updateWholeMap(in OccupancyGridMapRequestParam param, in OccupancyGridMap map);
+    MAP_RETURN_STATUS updateWholeMap(in OccupancyGridMap map);
 
     MAP_RETURN_STATUS requestLocalMap(in OccupancyGridMapRequestParam param, out OccupancyGridMap map);
 
